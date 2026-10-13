@@ -84,13 +84,23 @@ export const MIN_SIMILARITY = 0.85;
 const MIN_MARGIN = 0.1;
 const MIN_TOKENS = 4;
 
+function numericTokens(slug: string): string {
+  return slugTokens(slug)
+    .filter((t) => /^\d+$/.test(t))
+    .sort()
+    .join(",");
+}
+
 /** Best unambiguous candidate for a broken slug, or null. */
 export function findSimilarSlug(requested: string, candidates: readonly string[]): string | null {
   if (slugTokens(requested).length < MIN_TOKENS) return null;
+  const numbers = numericTokens(requested);
   let best: { slug: string; score: number } | null = null;
   let second = 0;
   for (const slug of candidates) {
     if (slug === requested) continue;
+    // Years and numbers must match exactly: "...-2027" must never land on "...-2026".
+    if (numericTokens(slug) !== numbers) continue;
     const score = slugSimilarity(requested, slug);
     if (!best || score > best.score) {
       second = best?.score ?? 0;

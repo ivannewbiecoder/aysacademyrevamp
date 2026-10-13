@@ -56,6 +56,10 @@ export function LeadForm({
   }
 
   const errors = state.status === "error" ? (state.errors ?? {}) : {};
+  // React resets the form after each action; refill from the echoed values and
+  // remount (key) so selects and the checkbox are restored too.
+  const v = state.status === "error" ? (state.values ?? {}) : {};
+  const formKey = state.status === "error" ? (state.attempt ?? 0) : 0;
   const err = (field: string) =>
     errors[field] ? (
       <span className="field-error" id={`${field}-error`}>
@@ -65,7 +69,7 @@ export function LeadForm({
   const describedBy = (field: string) => (errors[field] ? `${field}-error` : undefined);
 
   return (
-    <form action={action} className="lead-form" noValidate>
+    <form key={formKey} action={action} className="lead-form" noValidate>
       {state.status === "error" && (
         <p className="form-alert" role="alert">
           {state.message}
@@ -75,13 +79,13 @@ export function LeadForm({
       <div className="form-grid">
         <label className="field">
           <span>Nama lengkap</span>
-          <input name="name" autoComplete="name" required maxLength={100} aria-invalid={!!errors.name} aria-describedby={describedBy("name")} />
+          <input name="name" defaultValue={v.name} autoComplete="name" required maxLength={100} aria-invalid={!!errors.name} aria-describedby={describedBy("name")} />
           {err("name")}
         </label>
 
         <label className="field">
           <span>Saya adalah</span>
-          <select name="role" required defaultValue="" aria-invalid={!!errors.role} aria-describedby={describedBy("role")}>
+          <select name="role" required defaultValue={v.role ?? ""} aria-invalid={!!errors.role} aria-describedby={describedBy("role")}>
             <option value="" disabled>
               Pilih
             </option>
@@ -95,7 +99,7 @@ export function LeadForm({
 
         <label className="field">
           <span>Jenjang siswa</span>
-          <select name="level" required defaultValue="" aria-invalid={!!errors.level} aria-describedby={describedBy("level")}>
+          <select name="level" required defaultValue={v.level ?? ""} aria-invalid={!!errors.level} aria-describedby={describedBy("level")}>
             <option value="" disabled>
               Pilih
             </option>
@@ -109,7 +113,7 @@ export function LeadForm({
 
         <label className="field">
           <span>Bidang yang diminati</span>
-          <select name="programSlug" defaultValue={defaultProgram ?? ""}>
+          <select name="programSlug" defaultValue={v.programSlug ?? defaultProgram ?? ""}>
             <option value="">Belum tahu</option>
             {programs.map((p) => (
               <option key={p.slug} value={p.slug}>
@@ -123,6 +127,7 @@ export function LeadForm({
           <span>Nomor WhatsApp</span>
           <input
             name="whatsapp"
+            defaultValue={v.whatsapp}
             type="tel"
             inputMode="tel"
             autoComplete="tel"
@@ -139,7 +144,7 @@ export function LeadForm({
           <span>
             Email <small>(opsional)</small>
           </span>
-          <input name="email" type="email" autoComplete="email" maxLength={200} aria-invalid={!!errors.email} aria-describedby={describedBy("email")} />
+          <input name="email" defaultValue={v.email} type="email" autoComplete="email" maxLength={200} aria-invalid={!!errors.email} aria-describedby={describedBy("email")} />
           {err("email")}
         </label>
 
@@ -147,19 +152,19 @@ export function LeadForm({
           <span>
             Asal sekolah <small>(opsional)</small>
           </span>
-          <input name="school" autoComplete="organization" maxLength={150} />
+          <input name="school" defaultValue={v.school} autoComplete="organization" maxLength={150} />
         </label>
 
         <label className="field field--wide">
           <span>
             Pertanyaan atau kebutuhan <small>(opsional)</small>
           </span>
-          <textarea name="message" rows={4} maxLength={1000} />
+          <textarea name="message" defaultValue={v.message} rows={4} maxLength={1000} />
         </label>
       </div>
 
       <label className="consent">
-        <input type="checkbox" name="consent" required aria-invalid={!!errors.consent} aria-describedby={describedBy("consent")} />
+        <input type="checkbox" name="consent" defaultChecked={v.consent === "on"} required aria-invalid={!!errors.consent} aria-describedby={describedBy("consent")} />
         <span>
           Saya setuju data ini digunakan tim AYS untuk menghubungi saya terkait konsultasi program, sesuai{" "}
           <Link href="/kebijakan-privasi">kebijakan privasi</Link>.

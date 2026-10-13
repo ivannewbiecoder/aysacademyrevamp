@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ays
+          POSTGRES_PASSWORD: ays_ci_password
+          POSTGRES_DB: ays
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ays" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://ays:ays_ci_password@localhost:5432/ays
+      SITE_URL: http://localhost:3000
+      IP_HASH_SALT: ci-only-salt-not-secret-0123456789
+      TRUSTED_PROXY_COUNT: "0"
+      REVALIDATE_SECRET: ci-only-revalidate-secret-0123456789
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Migrations are up to date with the schema
+        run: npx drizzle-kit check
+      - run: npm run db:migrate
+      - run: npm run db:seed
+      - run: npm run build
+      - name: Smoke test against the production build
+        run: |
+          cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+          (cd .next/standalone && PORT=3000 HOSTNAME=127.0.0.1 node server.js > ../../server.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3000/api/health && break; sleep 1; done
+          BASE_URL=http://127.0.0.1:3000 npm run smoke
+      - name: Server log
+        if: failure()
+        run: cat server.log || true

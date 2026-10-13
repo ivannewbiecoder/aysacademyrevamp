@@ -32,8 +32,10 @@ type PageMetaInput = {
 export function pageMetadata(input: PageMetaInput): Metadata {
   const title = input.exactTitle ? input.title : titleWithBrand(input.title);
   const url = absoluteUrl(input.path);
-  // Without an explicit image, the opengraph-image file convention supplies one.
-  const images = input.image ? [{ url: absoluteUrl(input.image) }] : undefined;
+  // Page-level openGraph replaces the inherited file-based image, so always set one.
+  const images = input.image
+    ? [{ url: absoluteUrl(input.image) }]
+    : [{ url: absoluteUrl("/opengraph-image"), width: 1200, height: 630, alt: "AYS Science Academy – Pelatihan OSN untuk SMP dan SMA" }];
   return {
     title: { absolute: title },
     description: input.description,
@@ -46,7 +48,7 @@ export function pageMetadata(input: PageMetaInput): Metadata {
       description: input.description,
       siteName: ORG.name,
       locale: "id_ID",
-      ...(images ? { images } : {}),
+      images,
       ...(input.type === "article"
         ? {
             publishedTime: input.publishedTime ?? undefined,
@@ -58,7 +60,7 @@ export function pageMetadata(input: PageMetaInput): Metadata {
       card: "summary_large_image",
       title,
       description: input.description,
-      ...(images ? { images: images.map((i) => i.url) } : {}),
+      images: images.map((i) => i.url),
     },
   };
 }

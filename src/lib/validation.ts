@@ -19,8 +19,10 @@ const optionalText = (max: number) =>
     .optional()
     .transform((v) => v ?? null);
 
+/** HTML checkboxes are simply absent from FormData when unchecked, so the key must be optional. */
 const checkbox = z
-  .union([z.literal("on"), z.literal("true"), z.literal("1"), z.literal(""), z.null(), z.undefined()])
+  .union([z.literal("on"), z.literal("true"), z.literal("1"), z.literal(""), z.null()])
+  .optional()
   .transform((v) => v === "on" || v === "true" || v === "1");
 
 export const slugSchema = z

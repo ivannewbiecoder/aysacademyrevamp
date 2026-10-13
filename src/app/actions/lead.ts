@@ -10,12 +10,31 @@ import { fieldErrors, leadSchema } from "@/lib/validation";
 export type LeadFormState =
   | { status: "idle" }
   | { status: "success" }
-  | { status: "error"; message: string; errors?: Record<string, string> };
+  | {
+      status: "error";
+      message: string;
+      errors?: Record<string, string>;
+      /** Echo of what the visitor typed, so the form can be refilled after React resets it. */
+      values?: Record<string, string>;
+      attempt?: number;
+    };
+
+const ECHO_FIELDS = ["name", "role", "level", "programSlug", "whatsapp", "email", "school", "message", "consent"] as const;
+
+function echo(formData: FormData): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of ECHO_FIELDS) {
+    const value = formData.get(key);
+    if (typeof value === "string") out[key] = value.slice(0, 1000);
+  }
+  return out;
+}
 
 const MIN_FILL_MS = 2500;
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"] as const;
 
-export async function submitLead(_prev: LeadFormState, formData: FormData): Promise<LeadFormState> {
+export async function submitLead(prev: LeadFormState, formData: FormData): Promise<LeadFormState> {
+  const attempt = (prev.status === "error" ? (prev.attempt ?? 0) : 0) + 1;
   // Bot traps: hidden honeypot field and a minimum time on the form.
   const honeypot = String(formData.get("website") ?? "");
   const renderedAt = Number(formData.get("t") ?? 0);
@@ -31,7 +50,12 @@ export async function submitLead(_prev: LeadFormState, formData: FormData): Prom
 
   const limit = await consumeRateLimit(`lead:${ipHash}`, 5, 600);
   if (!limit.allowed) {
-    return { status: "error", message: "Terlalu banyak pengiriman. Coba lagi dalam beberapa menit atau hubungi kami via WhatsApp." };
+    return {
+      status: "error",
+      message: "Terlalu banyak pengiriman. Coba lagi dalam beberapa menit atau hubungi kami via WhatsApp.",
+      values: echo(formData),
+      attempt,
+    };
   }
 
   const parsed = leadSchema.safeParse({
@@ -47,7 +71,13 @@ export async function submitLead(_prev: LeadFormState, formData: FormData): Prom
     sourcePath: formData.get("sourcePath") ?? undefined,
   });
   if (!parsed.success) {
-    return { status: "error", message: "Periksa kembali isian yang ditandai.", errors: fieldErrors(parsed.error) };
+    return {
+      status: "error",
+      message: "Periksa kembali isian yang ditandai.",
+      errors: fieldErrors(parsed.error),
+      values: echo(formData),
+      attempt,
+    };
   }
 
   const utm: Record<string, string> = {};

@@ -16,6 +16,8 @@ loadEnv();
  *   npm run import:wp -- --file posts.json --write              # from a saved REST export
  *   --overwrite        update articles that already exist (default: skip)
  *   --download-media   copy images from the old site into public/uploads/wp
+ *   --site https://aysacademy.id   purge the live site's content cache afterwards
+ *                                  (needs REVALIDATE_SECRET in the environment)
  *
  * Run this BEFORE pointing the domain at the new app, while WordPress is still live.
  */
@@ -139,6 +141,20 @@ async function main() {
   console.log(`\nSelesai: ${posts.length} post dibaca · ${written} ditulis · ${skipped} dilewati (sudah ada / slug tidak valid)`);
   for (const p of problems) console.log(`  ! ${p}`);
   if (!write) console.log("Dry run: tidak ada yang disimpan.");
+  if (write && arg("site")) await purgeCache(arg("site")!);
+}
+
+async function purgeCache(site: string) {
+  const secret = process.env.REVALIDATE_SECRET;
+  if (!secret) {
+    console.log("! REVALIDATE_SECRET kosong; cache situs akan diperbarui sendiri dalam maks. 1 jam.");
+    return;
+  }
+  const res = await fetch(`${site.replace(/\/+$/, "")}/api/revalidate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+  console.log(res.ok ? "✓ Cache konten situs dibersihkan." : `! Gagal membersihkan cache (${res.status}).`);
 }
 
 main()

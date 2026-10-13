@@ -1,0 +1,45 @@
+# Local/production-like stack:  docker compose up -d --build
+# First run: docker compose run --rm tools npm run db:seed
+#            docker compose run --rm tools npm run admin:create -- --email you@aysacademy.id --name "Nama"
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ays
+      POSTGRES_USER: ays
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ays -d ays"]
+      interval: 5s
+      retries: 10
+
+  tools:
+    build: { context: ., target: tools }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://ays:${POSTGRES_PASSWORD}@db:5432/ays
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+      args:
+        NEXT_PUBLIC_GA_ID: ${NEXT_PUBLIC_GA_ID:-}
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://ays:${POSTGRES_PASSWORD}@db:5432/ays
+    depends_on:
+      db: { condition: service_healthy }
+      tools: { condition: service_completed_successfully }
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
