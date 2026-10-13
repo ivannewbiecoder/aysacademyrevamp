@@ -102,10 +102,12 @@ drizzle/               migrasi SQL
 - Header keamanan di semua halaman: CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP, HSTS (produksi), tanpa `X-Powered-By`.
 - Admin memakai CSP ketat per request (nonce + `strict-dynamic`), `Cache-Control: no-store`, dan `X-Robots-Tag: noindex`.
 - Password Argon2id (parameter OWASP), minimal 12 karakter. Sesi berupa token acak 256-bit yang disimpan sebagai hash SHA-256. Cookie `__Host-`, `HttpOnly`, `Secure`, `SameSite=Lax`. Sesi diganti saat login, dan semua sesi dikeluarkan saat ganti/reset password atau akun dinonaktifkan.
-- Login dibatasi per IP dan per email (rate limit di Postgres), pesan error generik, waktu respons dibuat konstan.
+- Login dibatasi per IP, per email+IP (ketat), dan per email (longgar, agar pihak luar tidak bisa mengunci akun admin). Pesan error generik, waktu respons dibuat konstan.
+- Password sementara (akun baru/reset) wajib diganti sebelum panel bisa dipakai. Sesi berakhir setelah 7 hari tidak aktif dan paling lama 30 hari sejak login.
 - Setiap Server Action memeriksa ulang sesi dan peran (tidak hanya mengandalkan layout). Next.js juga memverifikasi header Origin (CSRF).
 - Semua input divalidasi dengan Zod. Markdown disanitasi: HTML mentah, `javascript:`, dan atribut event dibuang. KaTeX dijalankan dengan `trust: false`.
-- Form konsultasi: honeypot, jebakan waktu, rate limit 5/10 menit per IP. IP disimpan sebagai hash bergaram. Webhook notifikasi tidak mengirim data pribadi.
+- Form konsultasi: honeypot, jebakan waktu, rate limit 5/10 menit per IP plus batas global 300/jam. IP disimpan sebagai hash bergaram. Webhook notifikasi tidak mengirim data pribadi.
+- IP pengunjung hanya diambil dari header proxy jika `TRUSTED_PROXY_COUNT` ≥ 1. **Di produksi, jalankan aplikasi di belakang reverse proxy (Nginx/Cloudflare) dan isi nilai ini**; tanpa proxy semua pengunjung berbagi satu kuota rate limit.
 - Ekspor CSV kebal formula injection. Akses lead, ekspor, login, dan perubahan konten tercatat di `audit_log`.
 - `npm audit --omit=dev`: 0 kerentanan. Satu advisory tersisa hanya di tooling ESLint (`braces`) dan belum ada versi perbaikannya; tidak terpapar ke produksi.
 
@@ -133,6 +135,8 @@ drizzle/               migrasi SQL
 - Perubahan di luar admin (impor, SQL manual) muncul paling lambat 1 jam, atau langsung dengan:
   `curl -X POST -H "Authorization: Bearer $REVALIDATE_SECRET" https://aysacademy.id/api/revalidate`
 - Monitoring: `GET /api/health` (200 = aplikasi dan database sehat).
+- Retensi data: jalankan `npm run leads:purge -- --months 12 --write` secara berkala (mis. bulanan) untuk menghapus lead lama.
+- Jangan membagikan folder `.next/standalone` hasil build di mesin yang punya `.env`: Next.js menyalin `.env` ke sana. Image Docker aman karena `.env` dikecualikan `.dockerignore`; isi variabel lewat environment saat runtime.
 - Backup: jadwalkan `pg_dump` harian. Tabel `leads` berisi data pribadi calon siswa (banyak di bawah umur); batasi akses dan masa simpannya.
 
 ## Perlu dikonfirmasi tim AYS sebelum launch

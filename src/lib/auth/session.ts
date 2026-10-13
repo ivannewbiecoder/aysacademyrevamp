@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import type { User } from "@/lib/db/schema";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // absolute limit, even with daily activity
 const SESSION_RENEW_MS = 24 * 60 * 60 * 1000; // renew at most once per day of activity
 
 export const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-ays_admin" : "ays_admin";
@@ -38,7 +39,7 @@ export async function createSession(userId: string): Promise<void> {
   (await cookies()).set(SESSION_COOKIE, token, cookieOptions(expiresAt));
 }
 
-export type SessionUser = Pick<User, "id" | "email" | "name" | "role">;
+export type SessionUser = Pick<User, "id" | "email" | "name" | "role" | "mustChangePassword">;
 
 /** Current admin user for this request, or null. Deduplicated per render. */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
@@ -52,12 +53,18 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
       email: schema.users.email,
       name: schema.users.name,
       role: schema.users.role,
+      mustChangePassword: schema.users.mustChangePassword,
       expiresAt: schema.sessions.expiresAt,
     })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.users.id, schema.sessions.userId))
     .where(
-      and(eq(schema.sessions.idHash, idHash), gt(schema.sessions.expiresAt, new Date()), eq(schema.users.active, true)),
+      and(
+        eq(schema.sessions.idHash, idHash),
+        gt(schema.sessions.expiresAt, new Date()),
+        gt(schema.sessions.createdAt, new Date(Date.now() - SESSION_MAX_AGE_MS)),
+        eq(schema.users.active, true),
+      ),
     )
     .limit(1);
   const row = rows[0];
@@ -74,7 +81,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
       // is authoritative and the cookie is refreshed on the next action.
     }
   }
-  return { id: row.id, email: row.email, name: row.name, role: row.role };
+  return { id: row.id, email: row.email, name: row.name, role: row.role, mustChangePassword: row.mustChangePassword };
 });
 
 export async function destroySession(): Promise<void> {

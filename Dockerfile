@@ -19,6 +19,8 @@ RUN npm run build
 
 # Used by docker compose to run migrations/seed/admin scripts (has dev tools).
 FROM build AS tools
+# Migrations and admin scripts do not need root.
+USER node
 CMD ["npm", "run", "db:migrate"]
 
 FROM node:22-bookworm-slim AS runner
