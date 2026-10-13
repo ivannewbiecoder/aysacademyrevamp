@@ -14,7 +14,9 @@ export function clientIpFromHeaders(headers: Headers, trustedProxyCount: number)
     const candidate = hops[hops.length - trustedProxyCount];
     if (candidate) return candidate;
   }
-  return headers.get("x-real-ip")?.trim() || "unknown";
+  // X-Real-IP is only trustworthy when a reverse proxy overwrites it.
+  if (trustedProxyCount > 0) return headers.get("x-real-ip")?.trim() || "unknown";
+  return "unknown";
 }
 
 export function hashIp(ip: string, salt: string): string {

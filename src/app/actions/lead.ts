@@ -48,8 +48,11 @@ export async function submitLead(prev: LeadFormState, formData: FormData): Promi
   const ip = clientIpFromHeaders(requestHeaders, env.TRUSTED_PROXY_COUNT);
   const ipHash = hashIp(ip, env.IP_HASH_SALT);
 
-  const limit = await consumeRateLimit(`lead:${ipHash}`, 5, 600);
-  if (!limit.allowed) {
+  const [limit, global] = await Promise.all([
+    consumeRateLimit(`lead:${ipHash}`, 5, 600),
+    consumeRateLimit("lead:global", 300, 3600),
+  ]);
+  if (!limit.allowed || !global.allowed) {
     return {
       status: "error",
       message: "Terlalu banyak pengiriman. Coba lagi dalam beberapa menit atau hubungi kami via WhatsApp.",

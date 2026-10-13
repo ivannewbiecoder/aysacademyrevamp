@@ -91,11 +91,13 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
 
   const env = serverEnv();
   const ipHash = hashIp(clientIpFromHeaders(await headers(), env.TRUSTED_PROXY_COUNT), env.IP_HASH_SALT);
-  const [byIp, byEmail] = await Promise.all([
+  // Strict per email+IP, looser per email so a third party cannot lock an admin out.
+  const [byIp, byEmailIp, byEmail] = await Promise.all([
     consumeRateLimit(`login-ip:${ipHash}`, 20, 900),
-    consumeRateLimit(`login-email:${email}`, 5, 900),
+    consumeRateLimit(`login-email-ip:${email}:${ipHash}`, 5, 900),
+    consumeRateLimit(`login-email:${email}`, 30, 900),
   ]);
-  if (!byIp.allowed || !byEmail.allowed) {
+  if (!byIp.allowed || !byEmailIp.allowed || !byEmail.allowed) {
     return { ok: false, message: "Terlalu banyak percobaan masuk. Tunggu 15 menit lalu coba lagi." };
   }
 
@@ -110,7 +112,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
 
   await createSession(user.id);
   await getDb().update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, user.id));
-  await resetRateLimit(`login-email:${email}`);
+  await resetRateLimit(`login-email-ip:${email}:${ipHash}`);
   await logAudit(user.id, "login", "user", user.id);
   redirect("/admin");
 }
@@ -138,7 +140,7 @@ export async function changeOwnPassword(_prev: ActionState, formData: FormData):
   }
   await getDb()
     .update(schema.users)
-    .set({ passwordHash: await hashPassword(next) })
+    .set({ passwordHash: await hashPassword(next), mustChangePassword: false })
     .where(eq(schema.users.id, user.id));
   // Sign out every other device, then start a fresh session here.
   await destroyAllSessionsForUser(user.id);
@@ -475,7 +477,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
     try {
       const inserted = await getDb()
         .insert(schema.users)
-        .values({ ...parsed.data, passwordHash: await hashPassword(tempPassword) })
+        .values({ ...parsed.data, passwordHash: await hashPassword(tempPassword), mustChangePassword: true })
         .returning({ id: schema.users.id });
       await logAudit(user.id, "create", "user", inserted[0].id, { email: parsed.data.email, role: parsed.data.role });
     } catch (error) {
@@ -514,7 +516,7 @@ export async function resetUserPassword(_prev: ActionState, formData: FormData):
     const tempPassword = generateTempPassword();
     await getDb()
       .update(schema.users)
-      .set({ passwordHash: await hashPassword(tempPassword) })
+      .set({ passwordHash: await hashPassword(tempPassword), mustChangePassword: true })
       .where(eq(schema.users.id, id));
     await destroyAllSessionsForUser(id);
     await logAudit(user.id, "reset_password", "user", id);

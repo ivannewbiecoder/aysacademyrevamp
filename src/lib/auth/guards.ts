@@ -21,9 +21,10 @@ export function can(user: Pick<SessionUser, "role"> | null, capability: Capabili
 }
 
 /** For pages: redirect to login when signed out, to the dashboard when not permitted. */
-export async function requirePageUser(capability?: Capability): Promise<SessionUser> {
+export async function requirePageUser(capability?: Capability, opts: { allowPendingPasswordChange?: boolean } = {}): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/admin/login");
+  if (user.mustChangePassword && !opts.allowPendingPasswordChange) redirect("/admin/akun?error=ganti-password");
   if (capability && !can(user, capability)) redirect("/admin?error=akses");
   return user;
 }
@@ -34,6 +35,7 @@ export class AuthError extends Error {}
 export async function requireActionUser(capability: Capability): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) throw new AuthError("Sesi berakhir. Silakan masuk kembali.");
+  if (user.mustChangePassword) throw new AuthError("Ganti password sementara Anda terlebih dahulu di menu Akun saya.");
   if (!can(user, capability)) throw new AuthError("Anda tidak memiliki akses untuk tindakan ini.");
   return user;
 }

@@ -25,11 +25,11 @@ async function main() {
   const db = getDb();
   const existing = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, input.email));
   if (existing.length) {
-    await db.update(schema.users).set({ passwordHash, role: input.role, active: true, name: input.name }).where(eq(schema.users.email, input.email));
+    await db.update(schema.users).set({ passwordHash, role: input.role, active: true, name: input.name, mustChangePassword: true }).where(eq(schema.users.email, input.email));
     await db.delete(schema.sessions).where(eq(schema.sessions.userId, existing[0].id));
     console.log(`✓ Akun ${input.email} sudah ada; password direset dan sesi lama dikeluarkan.`);
   } else {
-    await db.insert(schema.users).values({ ...input, passwordHash });
+    await db.insert(schema.users).values({ ...input, passwordHash, mustChangePassword: true });
     console.log(`✓ Akun ${input.role} ${input.email} dibuat.`);
   }
   console.log(`  Password sementara (tampil sekali): ${password}`);

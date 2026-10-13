@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = await getSessionUser();
-  if (!user || !can(user, "leads:read")) {
+  if (!user || user.mustChangePassword || !can(user, "leads:read")) {
     return new Response("Tidak diizinkan", { status: 403, headers: { "Cache-Control": "no-store" } });
   }
   const rows = await getDb().select().from(schema.leads).orderBy(desc(schema.leads.createdAt)).limit(10_000);

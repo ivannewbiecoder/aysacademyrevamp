@@ -44,6 +44,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: userRole("role").notNull().default("editor"),
   active: boolean("active").notNull().default(true),
+  /** Set for admin-issued temporary passwords; the user must change it before using the panel. */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   ...timestamps,
 });

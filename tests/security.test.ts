@@ -77,8 +77,12 @@ describe("client IP resolution", () => {
     expect(clientIpFromHeaders(headers, 1)).toBe("10.0.0.2");
     expect(clientIpFromHeaders(headers, 2)).toBe("203.0.113.9");
   });
-  it("ignores X-Forwarded-For when no proxy is trusted", () => {
+  it("ignores X-Forwarded-For and X-Real-IP when no proxy is trusted", () => {
     expect(clientIpFromHeaders(headers, 0)).toBe("unknown");
+    expect(clientIpFromHeaders(new Headers({ "x-real-ip": "1.2.3.4" }), 0)).toBe("unknown");
+  });
+  it("uses X-Real-IP set by a trusted proxy", () => {
+    expect(clientIpFromHeaders(new Headers({ "x-real-ip": "1.2.3.4" }), 1)).toBe("1.2.3.4");
   });
   it("hashes IPs with a salt", () => {
     expect(hashIp("1.2.3.4", "salt-a")).not.toBe(hashIp("1.2.3.4", "salt-b"));

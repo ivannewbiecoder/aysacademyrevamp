@@ -3,7 +3,8 @@ import { can, requirePageUser } from "@/lib/auth/guards";
 import { logoutAction } from "../actions";
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
-  const user = await requirePageUser();
+  // Pages enforce the pending password change themselves; the layout must still render for /admin/akun.
+  const user = await requirePageUser(undefined, { allowPendingPasswordChange: true });
   const items = [
     { href: "/admin", label: "Dasbor" },
     ...(can(user, "content:write") ? [{ href: "/admin/artikel", label: "Artikel & berita" }] : []),
